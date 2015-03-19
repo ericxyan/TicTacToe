@@ -86,7 +86,7 @@ reg [9:0] cursor_y = 70;
 	square[11:2]: y
 	square[1:0]: player
 	*/
-reg [8:0] square;
+reg [17:0] square;
 reg player = 1;
 /**
 	SW[0]: Move right. 
@@ -110,23 +110,23 @@ always @ (posedge KEY[1]) begin
 	// Draw
 	if(SW[4]) begin
 		if(cursor_x == 70 && cursor_y == 70) 
-			square[0] = player;
+			square[17:16] = player;
 		if(cursor_x == 230 && cursor_y == 70) 
-			square[1] = player;
+			square[15:14] = player;
 		if(cursor_x == 390 && cursor_y == 70) 
-			square[2] = player;
+			square[13:12] = player;
 		if(cursor_x == 70 && cursor_y == 230) 
-			square[3] = player;
+			square[11:10] = player;
 		if(cursor_x == 230 && cursor_y == 230) 
-			square[4] = player;
+			square[9:8] = player;
 		if(cursor_x == 390 && cursor_y ==230) 
-			square[5] = player;
+			square[7:6] = player;
 		if(cursor_x == 70 && cursor_y == 390) 
-			square[6] = player;
+			square[5:4] = player;
 		if(cursor_x == 230 && cursor_y == 390) 
-			square[7] = player;
+			square[3:2] = player;
 		if(cursor_x == 390 && cursor_y == 390) 
-			square[8] = player;
+			square[1:0] = player;
 		if(player == 1)
 			player = 2;
 		else
