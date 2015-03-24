@@ -13,10 +13,9 @@ module TicTacToe(
   output [17:0] LEDR,  //	LED Red[17:0]
 //	GPIO
  inout [35:0] GPIO_0,GPIO_1,	//	GPIO Connections
-//	TV Decoder
-//TD_DATA,    	//	TV Decoder Data bus 8 bits
-//TD_HS,		//	TV Decoder H_SYNC
-//TD_VS,		//	TV Decoder V_SYNC
+//  PS2 data and clock lines		
+  input	PS2_DAT,
+  input	PS2_CLK,
   output TD_RESET,	//	TV Decoder Reset
 // VGA
   output VGA_CLK,   						//	VGA Clock
@@ -78,8 +77,8 @@ VGA_Audio_PLL 	p1 (
 
 
 // Cursor
-reg [9:0] cursor_x = 70;
-reg [9:0] cursor_y = 70;
+reg [9:0] cursor_x;
+reg [9:0] cursor_y;
 
 /* Square
 	sqaure[21:12]: x
@@ -87,26 +86,129 @@ reg [9:0] cursor_y = 70;
 	square[1:0]: player
 	*/
 reg [17:0] square;
-reg player = 1;
+reg [1:0] player;
+
+reg scan_ready2;
 /**
 	SW[0]: Move right. 
 	SW[1]: Move left. 
 	SW[2]: Move down. 
 	SW[3]: Move up. 
 */
-always @ (posedge KEY[1]) begin
+initial begin
+square = 0;
+player = 1;
+cursor_x = 70;
+cursor_y = 70;
+scan_ready2 = 0;
+end
+
+//Keyboard Control
+wire reset = 1'b0;
+wire [7:0] scan_code;
+reg [7:0] history[1:4];
+wire read, scan_ready;
+
+oneshot pulser(
+   .pulse_out(read),
+   .trigger_in(scan_ready),
+   .clk(CLOCK_50)
+);
+
+keyboard kbd(
+  .keyboard_clk(PS2_CLK),
+  .keyboard_data(PS2_DAT),
+  .clock50(CLOCK_50),
+  .reset(reset),
+  .read(read),
+  .scan_ready(scan_ready),
+  .scan_code(scan_code)
+);
+
+
+always @ (posedge scan_ready) begin
+	if(scan_code == 8'h2D) begin
+		square <= 0;
+		player <= 1;
+		cursor_x <= 70;
+		cursor_y <= 70;
+		scan_ready2 = 0;
+	end
+if(scan_ready) begin
 	// move right
-	if(cursor_x < 390 && SW[0])
+	if((cursor_x == 70 || cursor_x == 230) && scan_code == 8'hE074)
+		cursor_x <= cursor_x + 160;
+	else if(cursor_x == 390 && scan_code == 8'hE074)
+		cursor_x <= 70;
+	// move left
+	if((cursor_x == 390 || cursor_x == 230) && scan_code == 8'hE06B)
+		cursor_x <= cursor_x - 160;
+	else if(cursor_x == 70 && scan_code == 8'hE06B)
+		cursor_x <= 390;
+	// move down
+	if((cursor_y == 70 || cursor_y == 230) && scan_code == 8'hE075)
+		cursor_y <= cursor_y + 160;
+	else if(cursor_y == 390 && scan_code == 8'hE075)
+		cursor_y <= 70;
+	// move up
+	if((cursor_y == 390 || cursor_y == 230) && scan_code == 8'hE072)
+		cursor_y <= cursor_y - 160;
+	else if(cursor_y == 70 && scan_code == 8'hE072)
+		cursor_y <= 390;
+	if(scan_code == 8'h29 || scan_code == 8'h5A) begin
+		if(cursor_x == 70 && cursor_y == 70) 
+			square[17:16] <= player;
+		if(cursor_x == 230 && cursor_y == 70) 
+			square[15:14] <= player;
+		if(cursor_x == 390 && cursor_y == 70) 
+			square[13:12] <= player;
+		if(cursor_x == 70 && cursor_y == 230) 
+			square[11:10] <= player;
+		if(cursor_x == 230 && cursor_y == 230) 
+			square[9:8] <= player;
+		if(cursor_x == 390 && cursor_y ==230) 
+			square[7:6] <= player;
+		if(cursor_x == 70 && cursor_y == 390) 
+			square[5:4] <= player;
+		if(cursor_x == 230 && cursor_y == 390) 
+			square[3:2] <= player;
+		if(cursor_x == 390 && cursor_y == 390) 
+			square[1:0] <= player;
+		if(scan_code == 8'h29 && player == 1)
+			player <= 2;
+		else if (scan_code == 8'h29 && player ==2)
+			player <= 1;
+	end
+end
+end
+
+// SW Control
+/*
+always @ (posedge KEY[1]) begin
+	if(SW[5]) begin
+		square = 0;
+		player = 1;
+	end
+	// move right
+	if(cursor_x <= 230 && SW[0])
 		cursor_x = cursor_x + 160;
+	else if(SW[0])
+		cursor_x = 70;
 	// move left
 	if(cursor_x > 70 && SW[1])
 		cursor_x = cursor_x - 160;
+	else if(SW[1])
+		cursor_x = 390;
 	// move down
-	if((cursor_y < 390) && SW[2])
+	if((cursor_y <= 230) && SW[2])
 		cursor_y = cursor_y + 160;
+	else if(SW[2])
+		cursor_y = 70;
 	// move up
 	if((cursor_y > 70) && SW[3])
 		cursor_y = cursor_y - 160;
+	else if(SW[3])
+		cursor_y = 390;
 	// Draw
 	if(SW[4]) begin
 		if(cursor_x == 70 && cursor_y == 70) 
@@ -133,7 +235,7 @@ always @ (posedge KEY[1]) begin
 			player = 1;
 	end
 end
-
+*/
 
 wire [9:0] r, g, b;
 

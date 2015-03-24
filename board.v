@@ -10,7 +10,7 @@ module board(
 
 reg [1:0] r;
 reg [1:0] c;
-reg [2:0] square2 [2:0];
+reg [1:0] square2 [2:0] [2:0];
 
 always @(square) begin
 square2[0][0] <= square[17:16];
@@ -26,6 +26,7 @@ end
 
 always @(x, cursor_x) begin
 	// Board
+
 	if(y<480 && ((x>140 && x<160) || (x>300 && x<320))) begin
 		red = 10'h3ff;
 		green = 10'h3ff;
@@ -35,7 +36,6 @@ always @(x, cursor_x) begin
 		green = 10'h3ff;
 		blue = 10'h3ff;
 	end else if((x > (cursor_x - 10) && x < (cursor_x + 10)) && (y > (cursor_y - 10) && y < (cursor_y + 10))) begin
-		// Cursor
 		red = 10'h3ff;
 		green = 10'h3ff;
 		blue = 10'h3ff;
@@ -45,20 +45,19 @@ always @(x, cursor_x) begin
 		green = 10'h000;
 	end
 
-	// Squares 3X3
+	// square
 	for(r=0; r < 3; r=r+1) begin
 		for(c=0; c < 3; c=c+1) begin
-			if(x > (cursor_x+160*c - 50) && x < (cursor_x+160*c + 50) && y > (cursor_x+160*r - 50) && y < (cursor_x+160*r + 50)) begin
-					if(square2[r][c] == 1) begin
-						red = 10'h3ff;
-						green = 10'h000;
-						blue = 10'h000;
-					end
-					if(square2[r][c] == 2)begin
-						red = 10'h000;
-						green = 10'h3ff;
-						blue = 10'h000;
-					end
+			if(x > (70+160*c - 50) && x < (70+160*c + 50) && y > (70+160*r - 50) && y < (70+160*r + 50)) begin
+				if(square2[r][c] == 1) begin
+					red = 10'h3ff;
+					green = 10'h000;
+					blue = 10'h000;
+				end else if(square2[r][c] == 2)begin
+					red = 10'h000;
+					green = 10'h3ff;
+					blue = 10'h000;
+				end
 			end
 		end
 	end
