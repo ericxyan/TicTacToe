@@ -2,7 +2,6 @@ module TicTacToe(
 //	Clock Input
   input CLOCK_50,	//	50 MHz
   input CLOCK_27,     //      27 MHz
-//	Push Button
   input [3:0] KEY,      //	Pushbutton[3:0]
 //	DPDT Switch
   input [17:0] SW,		//	Toggle Switch[17:0]
@@ -86,6 +85,11 @@ reg [9:0] cursor_y;
 	square[1:0]: player
 	*/
 reg [17:0] square;
+reg [1:0] square2 [2:0] [2:0];
+reg [1:0] rn;
+reg [1:0] cn;
+reg [5:0] CRD [7:0]; // [7:5]Column, [4:2]Row, [1:0]Diagonal;
+reg [3:0] CRD_i;
 reg [1:0] player;
 
 reg scan_ready2;
@@ -95,20 +99,23 @@ reg scan_ready2;
 	SW[2]: Move down. 
 	SW[3]: Move up. 
 */
+
+
+
 initial begin
 square = 0;
 player = 1;
 cursor_x = 70;
 cursor_y = 70;
-scan_ready2 = 0;
 end
 
 //Keyboard Control
 wire reset = 1'b0;
 wire [7:0] scan_code;
 reg [7:0] history[1:4];
+reg [7:0] new_code;
 wire read, scan_ready;
-
+/*
 oneshot pulser(
    .pulse_out(read),
    .trigger_in(scan_ready),
@@ -124,63 +131,266 @@ keyboard kbd(
   .scan_ready(scan_ready),
   .scan_code(scan_code)
 );
+*/
+// Internal Wires
 
 
-always @ (posedge scan_ready) begin
-	if(scan_code == 8'h2D) begin
-		square <= 0;
-		player <= 1;
+// Internal Registers
+PS2_Controller PS2 (
+	// Inputs
+	.CLOCK_50				(CLOCK_50),
+	.reset				(~KEY[0]),
+
+	// Bidirectionals
+	.PS2_CLK			(PS2_CLK),
+ 	.PS2_DAT			(PS2_DAT),
+
+	// Outputs
+	.received_data		(scan_code),
+	.received_data_en	(scan_ready)
+);
+
+always @ (posedge scan_ready) begin 
+	history[4] <= history[3];
+	history[3] <= history[2];
+	history[2] <= history[1];
+	history[1] <= scan_code;
+	if(scan_code == 8'h2D) begin 
+		square = 0;
+		player = 1;
 		cursor_x <= 70;
-		cursor_y <= 70;
-		scan_ready2 = 0;
-	end
-if(scan_ready) begin
-	// move right
-	if((cursor_x == 70 || cursor_x == 230) && scan_code == 8'hE074)
-		cursor_x <= cursor_x + 160;
-	else if(cursor_x == 390 && scan_code == 8'hE074)
-		cursor_x <= 70;
-	// move left
-	if((cursor_x == 390 || cursor_x == 230) && scan_code == 8'hE06B)
-		cursor_x <= cursor_x - 160;
-	else if(cursor_x == 70 && scan_code == 8'hE06B)
-		cursor_x <= 390;
-	// move down
-	if((cursor_y == 70 || cursor_y == 230) && scan_code == 8'hE075)
-		cursor_y <= cursor_y + 160;
-	else if(cursor_y == 390 && scan_code == 8'hE075)
-		cursor_y <= 70;
-	// move up
-	if((cursor_y == 390 || cursor_y == 230) && scan_code == 8'hE072)
-		cursor_y <= cursor_y - 160;
-	else if(cursor_y == 70 && scan_code == 8'hE072)
-		cursor_y <= 390;
-	if(scan_code == 8'h29 || scan_code == 8'h5A) begin
-		if(cursor_x == 70 && cursor_y == 70) 
-			square[17:16] <= player;
-		if(cursor_x == 230 && cursor_y == 70) 
-			square[15:14] <= player;
-		if(cursor_x == 390 && cursor_y == 70) 
-			square[13:12] <= player;
-		if(cursor_x == 70 && cursor_y == 230) 
-			square[11:10] <= player;
-		if(cursor_x == 230 && cursor_y == 230) 
-			square[9:8] <= player;
-		if(cursor_x == 390 && cursor_y ==230) 
-			square[7:6] <= player;
-		if(cursor_x == 70 && cursor_y == 390) 
-			square[5:4] <= player;
-		if(cursor_x == 230 && cursor_y == 390) 
-			square[3:2] <= player;
-		if(cursor_x == 390 && cursor_y == 390) 
-			square[1:0] <= player;
-		if(scan_code == 8'h29 && player == 1)
-			player <= 2;
-		else if (scan_code == 8'h29 && player ==2)
-			player <= 1;
-	end
-end
-end
+		cursor_y = 70;
+	end // 137-142
+
+	if(scan_ready == 1'b1) begin 
+		if(history[2] == 8'hE0) begin
+			// move right
+			if(history[1] == 8'h74 && cursor_x <= 300)
+				cursor_x <= cursor_x + 160;
+			// move left
+			if(history[1] == 8'h6B && cursor_x >= 160)
+				cursor_x <= cursor_x - 160;
+			// move down
+			if( history[1] == 8'h72 && cursor_y <= 300)
+				cursor_y = cursor_y + 160;
+			// move up
+			if(history[1] == 8'h75 && cursor_y >= 160)
+				cursor_y = cursor_y - 160;
+		end
+			/* Record each square belonging to which player.
+			 * A player cannot draw twice consecutively.
+			 */
+		if(history[2] != 8'hF0) begin
+			if((history[1] == 8'h29 && player == 1)|| (history[1] == 8'h5A && player == 2)) begin 
+				if(cursor_x == 70 && cursor_y == 70) 
+					square[17:16] = player;
+				if(cursor_x == 230 && cursor_y == 70) 
+					square[15:14] = player;
+				if(cursor_x == 390 && cursor_y == 70) 
+					square[13:12] = player;
+				if(cursor_x == 70 && cursor_y == 230) 
+					square[11:10] = player;
+				if(cursor_x == 230 && cursor_y == 230) 
+					square[9:8] = player;
+				if(cursor_x == 390 && cursor_y ==230) 
+					square[7:6] = player;
+				if(cursor_x == 70 && cursor_y == 390) 
+					square[5:4] = player;
+				if(cursor_x == 230 && cursor_y == 390) 
+					square[3:2] = player;
+				if(cursor_x == 390 && cursor_y == 390) 
+					square[1:0] = player;
+					
+					player = 2;
+
+					// Split into squares, square2[row][column]
+					square2[0][0] = square[17:16];
+					square2[0][1] = square[15:14];
+					square2[0][2] = square[13:12];
+					square2[1][0] = square[11:10];
+					square2[1][1] = square[9:8];
+					square2[1][2] = square[7:6];
+					square2[2][0] = square[5:4];
+					square2[2][1] = square[3:2];
+					square2[2][2] = square[1:0];
+					// Split Columns
+					CRD[7][5:4] = square2[0][0];
+					CRD[7][3:2] = square2[1][0];
+					CRD[7][1:0] = square2[2][0];
+
+					CRD[6][5:4] = square2[0][1];
+					CRD[6][3:2] = square2[1][1];
+					CRD[6][1:0] = square2[2][1];
+
+					CRD[5][5:4] = square2[0][2];
+					CRD[5][3:2] = square2[1][2];
+					CRD[5][1:0] = square2[2][2];
+
+					// Split Rows
+					CRD[4][5:4] = square2[0][0];
+					CRD[4][3:2] = square2[0][1];
+					CRD[4][1:0] = square2[0][2];
+
+					CRD[3][5:4] = square2[1][0];
+					CRD[3][3:2] = square2[1][1];
+					CRD[3][1:0] = square2[1][2];
+
+					CRD[2][5:4] = square2[2][0];
+					CRD[2][3:2] = square2[2][1];
+					CRD[2][1:0] = square2[2][2];
+
+					// Split Diagonals
+					CRD[1][5:4] = square2[0][0];
+					CRD[1][3:2] = square2[1][1];
+					CRD[1][1:0] = square2[2][2];
+
+					CRD[0][5:4] = square2[0][2];
+					CRD[0][3:2] = square2[1][1];
+					CRD[0][1:0] = square2[2][0];
+					
+					for(CRD_i=0; CRD_i<8;CRD_i=CRD_i+1) begin 
+						// player-x(01), AI-o(10), empty-z
+						// will win? Check for states: ooz, ozo, zoo.
+						if(player == 2) begin
+							if(CRD[CRD_i] == 6'b101000) begin
+								CRD[CRD_i][1:0] = 2'b10;
+								player = 1;
+								case(CRD_i) 
+									0: square2[2][0] = 2'b10;
+									1: square2[2][2] = 2'b10;
+									2: square2[2][2] = 2'b10;
+									3: square2[1][2] = 2'b10;
+									4: square2[0][2] = 2'b10;
+									5: square2[2][2] = 2'b10;
+									6: square2[2][1] = 2'b10;
+									7: square2[2][0] = 2'b10;
+								endcase
+							end else if(CRD[CRD_i] == 6'b100010) begin
+								CRD[CRD_i][3:2] = 2'b10;
+								player = 1;
+								case(CRD_i) 
+									0: square2[1][1] = 2'b10;
+									1: square2[1][1] = 2'b10;
+									2: square2[2][1] = 2'b10;
+									3: square2[1][1] = 2'b10;
+									4: square2[0][1] = 2'b10;
+									5: square2[1][2] = 2'b10;
+									6: square2[1][1] = 2'b10;
+									7: square2[1][0] = 2'b10;
+								endcase
+							end else if(CRD[CRD_i] == 6'b001010) begin
+								CRD[CRD_i][5:4] = 2'b10;
+								player = 1;
+								case(CRD_i) 
+									0: square2[0][2] = 2'b10;
+									1: square2[0][0] = 2'b10;
+									2: square2[2][0] = 2'b10;
+									3: square2[1][0] = 2'b10;
+									4: square2[0][0] = 2'b10;
+									5: square2[0][2] = 2'b10;
+									6: square2[0][1] = 2'b10;
+									7: square2[0][0] = 2'b10;
+								endcase
+							end
+						end
+					end
+					
+					// will lose? Check for states: xxz, xzx, zxx.
+					
+					if(player == 2)begin 
+						for(CRD_i = 0; CRD_i < 8; CRD_i = CRD_i + 1) begin 
+							if(player == 2) begin
+								if(CRD[CRD_i] == 6'b010100) begin
+									CRD[CRD_i][1:0] = 2'b10;
+									player = 1;
+									case(CRD_i) 
+										0: square2[2][0] = 2'b10;
+										1: square2[2][2] = 2'b10;
+										2: square2[2][2] = 2'b10;
+										3: square2[1][2] = 2'b10;
+										4: square2[0][2] = 2'b10;
+										5: square2[2][2] = 2'b10;
+										6: square2[2][1] = 2'b10;
+										7: square2[2][0] = 2'b10;
+									endcase
+								end else if(CRD[CRD_i] == 6'b010001) begin
+									CRD[CRD_i][3:2] = 2'b10;
+									player = 1;
+									case(CRD_i) 
+										0: square2[1][1] = 2'b10;
+										1: square2[1][1] = 2'b10;
+										2: square2[2][1] = 2'b10;
+										3: square2[1][1] = 2'b10;
+										4: square2[0][1] = 2'b10;
+										5: square2[1][2] = 2'b10;
+										6: square2[1][1] = 2'b10;
+										7: square2[1][0] = 2'b10;
+									endcase
+								end else if(CRD[CRD_i] == 6'b000101) begin
+									CRD[CRD_i][5:4] = 2'b10;
+									player = 1;
+									case(CRD_i) 
+										0: square2[0][2] = 2'b10;
+										1: square2[0][0] = 2'b10;
+										2: square2[2][0] = 2'b10;
+										3: square2[1][0] = 2'b10;
+										4: square2[0][0] = 2'b10;
+										5: square2[0][2] = 2'b10;
+										6: square2[0][1] = 2'b10;
+										7: square2[0][0] = 2'b10;
+									endcase
+								end
+							end
+						end 
+
+					end 
+
+					// check every square to find an empty one.
+					if(player == 2) begin 
+						if(square2[1][1] == 2'b00) begin
+							square2[1][1] = 2'b10;
+							player = 1;
+						end else if(square2[0][0] == 2'b00) begin
+							square2[0][0] = 2'b10;
+							player = 1;
+						end else if(square2[0][2] == 2'b00) begin
+							square2[0][2] = 2'b10;
+							player = 1;
+						end else if(square2[2][0] == 2'b00) begin
+							square2[2][0] = 2'b10;
+							player = 1;
+						end else if(square2[2][2] == 2'b00) begin
+							square2[2][2] = 2'b10;
+							player = 1;
+						end else begin 
+							for(rn=0; rn < 3; rn=rn+1) begin
+								for(cn=0; cn < 3; cn=cn+1) begin
+									if(player == 2 && square2[rn][cn] == 2'b00) begin
+										square2[rn][cn] = 2'b10;
+										player = 1;
+									end
+								end
+							end
+						end
+					end 
+
+
+					// write back to square.
+					square[17:16] = square2[0][0];
+					square[15:14] = square2[0][1];
+					square[13:12] = square2[0][2];
+					square[11:10] = square2[1][0];
+					square[9:8] = square2[1][1];
+					square[7:6] = square2[1][2];
+					square[5:4] = square2[2][0];
+					square[3:2] = square2[2][1];
+					square[1:0] = square2[2][2];
+
+				end else if (history[1] == 8'h5A && player == 2)
+					player = 1;
+			end 
+		end
+	end 
 
 // SW Control
 /*
@@ -190,7 +400,7 @@ always @ (posedge KEY[1]) begin
 		player = 1;
 	end
 	// move right
-	if(cursor_x <= 230 && SW[0])
+	if(cursor_x = 230 && SW[0])
 		cursor_x = cursor_x + 160;
 	else if(SW[0])
 		cursor_x = 70;
@@ -200,7 +410,7 @@ always @ (posedge KEY[1]) begin
 	else if(SW[1])
 		cursor_x = 390;
 	// move down
-	if((cursor_y <= 230) && SW[2])
+	if((cursor_y = 230) && SW[2])
 		cursor_y = cursor_y + 160;
 	else if(SW[2])
 		cursor_y = 70;
@@ -236,7 +446,6 @@ always @ (posedge KEY[1]) begin
 	end
 end
 */
-
 wire [9:0] r, g, b;
 
 // Board
